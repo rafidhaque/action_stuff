@@ -30,7 +30,7 @@ runs:
       shell: bash
       run: |
         # sudo bpftrace /tmp/monitor.bt
-        sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo /tmp/bpftrace.pid'
+        sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo $! > /tmp/bpftrace.pid'
 
         sleep 2
 
