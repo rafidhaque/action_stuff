@@ -29,9 +29,6 @@ runs:
     - name: start monitor
       shell: bash
       run: |
-        # sudo bpftrace /tmp/monitor.bt
         sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo $! > /tmp/bpftrace.pid'
 
-        sleep 2
-
-        cat /tmp/ebpf_trace.log
+        timeout 30 bash -c 'until grep -q "ELAPSED_MS" /tmp/ebpf_trace.log 2>/dev/null; do sleep 0.5; done'
