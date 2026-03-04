@@ -1,38 +1,52 @@
-name: 'ebpf monitor'
-description: 'Monitors process executions using eBPF and bpftrace'
+name: 'eBPF Process Monitor'
+description: >
+  Attaches a bpftrace probe to the execve syscall tracepoint and streams
+  captured events to /tmp/ebpf_trace.log for later analysis.
 
 runs:
   using: 'composite'
   steps:
-    - name: check bpftrace existance
+    - name: Verify bpftrace
       shell: bash
       run: |
         if ! command -v bpftrace &>/dev/null; then
+          echo "bpftrace not found — installing..."
           sudo apt-get install -y bpftrace
+        else
+          echo "bpftrace available: $(bpftrace --version)"
         fi
 
-    - name: run bpftrace stuff
+    - name: Write bpftrace program
       shell: bash
       run: |
         sudo tee /tmp/monitor.bt > /dev/null << 'EOF'
-        BEGIN
-        {
-          printf("%s %s %s %s\n", "ELAPSED_MS", "PID", "COMM", "FILENAME");
+        BEGIN {
+          printf("=== eBPF monitor attached ===\n");
+          printf("%-12s %-7s %-16s %s\n", "ELAPSED_MS", "PID", "COMM", "FILENAME");
         }
-        
-        tracepoint:syscalls:sys_enter_execve
-        {
-          printf("%llu %s %s %s\n", elapsed, pid, comm, str(args->filename));  
+
+        tracepoint:syscalls:sys_enter_execve {
+          printf("%-12llu %-7d %-16s %s\n",
+            elapsed / 1000000,
+            pid,
+            comm,
+            str(args->filename));
         }
         EOF
 
-    - name: start monitor
+    - name: Start eBPF monitor
       shell: bash
       run: |
+        # Run bpftrace inside a root shell so the redirect is opened by root
+        # AFTER crossing the sudo pty boundary. This prevents Ubuntu 24.04's
+        # "Defaults use_pty" from intercepting bpftrace's fd1 and losing output
+        # when the step shell exits and the pty relay is orphaned.
         sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo $! > /tmp/bpftrace.pid'
 
+        # Allow bpftrace time to attach to the tracepoint before returning
         sleep 2
 
+        # Confirm the process is still alive; surface the log if it crashed
         if sudo kill -0 "$(cat /tmp/bpftrace.pid)" 2>/dev/null; then
           echo "Monitor is active (PID $(cat /tmp/bpftrace.pid)) — capturing events."
           echo "--- initial log (BEGIN block should appear here) ---"

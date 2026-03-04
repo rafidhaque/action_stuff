@@ -1,31 +1,42 @@
-name: ebpf-trace
+name: PoC — eBPF Provenance Trace
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    
+
 jobs:
   trace:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run eBPF monitor
+      # ── Phase 1: Attach the eBPF monitor ─────────────────────────────────────
+      - name: Start eBPF monitor
         uses: ./.github/actions/ebpf-monitor
-      
-      - name: Some Activity
+
+      # ── Phase 2: Simulate workflow activity ───────────────────────────────────
+      - name: Simulate workflow activity
         run: |
+          echo "--- simulation start ---"
           curl -s http://example.com -o /dev/null
           whoami
           ls -la /tmp
-          python3 -c "print('Hello from Python')"
+          python3 -c "print('hello from ProvAction')"
+          echo "--- simulation end ---"
 
-      - name: stop and trace coolect
+      # ── Phase 3: Stop monitor and surface the trace ───────────────────────────
+      - name: Stop monitor and collect trace
         if: always()
         run: |
+          # Terminate bpftrace and give it a moment to flush buffered output
           sudo pkill -INT bpftrace || true
           sleep 1
 
+          echo ""
+          echo "============================================"
+          echo "           eBPF Execve Trace Log            "
+          echo "============================================"
           cat /tmp/ebpf_trace.log
