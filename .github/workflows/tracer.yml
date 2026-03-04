@@ -17,7 +17,7 @@ jobs:
       
       - name: Some Activity
         run: |
-          curl -s https://www.google.com > /dev/null
+          curl -s http://example.com -o /dev/null
           whoami
           ls -la /tmp
           python3 -c "print('Hello from Python')"
@@ -26,6 +26,6 @@ jobs:
         if: always()
         run: |
           sudo pkill -INT bpftrace || true
-          sleep 2
+          sleep 1
 
           cat /tmp/ebpf_trace.log
