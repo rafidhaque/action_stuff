@@ -31,4 +31,14 @@ runs:
       run: |
         sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo $! > /tmp/bpftrace.pid'
 
-        timeout 30 bash -c 'until grep -q "ELAPSED_MS" /tmp/ebpf_trace.log 2>/dev/null; do sleep 0.5; done'
+        sleep 2
+
+        if sudo kill -0 "$(cat /tmp/bpftrace.pid)" 2>/dev/null; then
+          echo "Monitor is active (PID $(cat /tmp/bpftrace.pid)) — capturing events."
+          echo "--- initial log (BEGIN block should appear here) ---"
+          cat /tmp/ebpf_trace.log
+        else
+          echo "ERROR: bpftrace exited unexpectedly. Log output:"
+          cat /tmp/ebpf_trace.log
+          exit 1
+        fi
