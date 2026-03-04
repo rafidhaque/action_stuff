@@ -1,1 +1,37 @@
 name: 'ebpf monitor'
+description: 'Monitors process executions using eBPF and bpftrace'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: check bpftrace existance
+      shell: bash
+      run: |
+        if ! command -v bpftrace &>/dev/null; then
+          sudo apt-get install -y bpftrace
+        fi
+
+    - name: run bpftrace stuff
+      shell: bash
+      run: |
+        sudo tee /tmp/monitor.bt > /dev/null << 'EOF'
+        BEGIN
+        {
+          printf("%s %s %s %s\n", "ELAPSED_MS", "PID", "COMM", "FILENAME");
+        }
+        
+        tracepoint:syscalls:sys_enter_execve
+        {
+          printf("%llu %s %s %s\n", elapsed, pid, comm, str(args->filename));  
+        }
+        EOF
+
+    - name: start monitor
+      shell: bash
+      run: |
+        # sudo bpftrace /tmp/monitor.bt
+        sudo bash -c 'bpftrace -B none /tmp/monitor.bt > /tmp/ebpf_trace.log 2>&1 & echo /tmp/bpftrace.pid'
+
+        sleep 2
+
+        cat /tmp/ebpf_trace.log
